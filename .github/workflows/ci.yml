@@ -1,0 +1,150 @@
+# N-01 이미지 파이프라인 (서비스 2개): 빌드·테스트 → 커밋 해시 태그 → 레지스트리 푸시 → 배포 서비스에 이벤트 전달
+#
+# - PR: 테스트 + Compose로 두 서비스를 띄워 서비스 간 통신 스모크 테스트 (푸시 없음)
+# - main push: 위 과정 + backend·frontend 이미지(linux/amd64·arm64)를 ghcr.io에 커밋 해시 태그로 푸시 + 이벤트 전달
+# - 이미지 태그는 항상 커밋 해시(github.sha)이며 latest는 쓰지 않아요.
+# - 레지스트리는 팀 결정 전까지 GHCR(GITHUB_TOKEN 사용, 별도 비밀값 불필요)을 써요.
+# - 배포 서비스 이벤트: 저장소 Secret DAISY_WEBHOOK_URL이 있으면 JSON을 POST하고, 없으면 건너뛰어요.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - name: make check (gofmt, go vet, go test, build)
+        run: make check
+
+  e2e:
+    name: e2e (compose)
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Start both services with Docker Compose
+        run: |
+          COMMIT=${GITHUB_SHA} BUILD_TIME="$(date -u +%Y-%m-%dT%H:%M:%SZ)" docker compose up --build -d --wait
+      - name: Smoke test through the frontend
+        run: |
+          BASE_URL=http://localhost:8080 WAIT_SECONDS=20 EXPECTED_COMMIT=${GITHUB_SHA} ./scripts/smoke-test.sh \
+            || { docker compose logs; exit 1; }
+      - name: Graceful shutdown (exit code 0 for both services)
+        run: |
+          docker compose stop
+          docker compose ps -a --format '{{.Service}} {{.ExitCode}}'
+          test -z "$(docker compose ps -a --format '{{.ExitCode}}' | grep -v '^0$')"
+      - name: Tear down
+        if: always()
+        run: docker compose down
+
+  images:
+    name: images
+    needs: e2e
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      backend: ${{ steps.meta.outputs.backend }}
+      frontend: ${{ steps.meta.outputs.frontend }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Image metadata
+        id: meta
+        run: |
+          owner="$(echo "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')"
+          {
+            echo "backend=ghcr.io/${owner}/sample-msa-backend:${GITHUB_SHA}"
+            echo "frontend=ghcr.io/${owner}/sample-msa-frontend:${GITHUB_SHA}"
+            echo "created=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "version=$(sed -n 's/^[[:space:]]*Version[[:space:]]*= "\(.*\)"/\1/p' internal/buildinfo/buildinfo.go)"
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v4
+
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push backend (linux/amd64, linux/arm64)
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: services/backend/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.backend }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+          build-args: |
+            VERSION=${{ steps.meta.outputs.version }}
+            COMMIT=${{ github.sha }}
+            BUILD_TIME=${{ steps.meta.outputs.created }}
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,scope=backend,mode=max
+
+      - name: Build and push frontend (linux/amd64, linux/arm64)
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: services/frontend/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.frontend }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+          build-args: |
+            VERSION=${{ steps.meta.outputs.version }}
+            COMMIT=${{ github.sha }}
+            BUILD_TIME=${{ steps.meta.outputs.created }}
+          cache-from: type=gha,scope=frontend
+          cache-to: type=gha,scope=frontend,mode=max
+
+      - name: Summary
+        run: |
+          {
+            echo "Pushed:"
+            echo "- \`${{ steps.meta.outputs.backend }}\`"
+            echo "- \`${{ steps.meta.outputs.frontend }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  notify:
+    name: notify deploy service
+    needs: images
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send image event
+        env:
+          WEBHOOK_URL: ${{ secrets.DAISY_WEBHOOK_URL }}
+          BACKEND_IMAGE: ${{ needs.images.outputs.backend }}
+          FRONTEND_IMAGE: ${{ needs.images.outputs.frontend }}
+        run: |
+          if [ -z "${WEBHOOK_URL}" ]; then
+            echo "::notice::DAISY_WEBHOOK_URL secret is not set; skipping deploy-service event"
+            exit 0
+          fi
+          payload=$(printf '{"repository":"%s","commit":"%s","ref":"%s","images":{"backend":"%s","frontend":"%s"},"run_url":"%s"}' \
+            "${GITHUB_REPOSITORY}" "${GITHUB_SHA}" "${GITHUB_REF}" "${BACKEND_IMAGE}" "${FRONTEND_IMAGE}" \
+            "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}")
+          curl -fsS --max-time 15 --retry 3 -X POST -H 'Content-Type: application/json' -d "${payload}" "${WEBHOOK_URL}"

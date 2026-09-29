@@ -1,0 +1,48 @@
+# 두 서비스를 한 번에 띄워요. frontend는 backend를 서비스 이름(http://backend:8080)으로 찾아요.
+#   docker compose up --build   → http://localhost:8080
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: services/backend/Dockerfile
+      args:
+        VERSION: ${VERSION:-}
+        COMMIT: ${COMMIT:-unknown}
+        BUILD_TIME: ${BUILD_TIME:-unknown}
+    image: hellocalc-backend:local
+    environment:
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    expose:
+      - "8080"            # 내부 전용: 호스트에 공개하지 않아요
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    stop_grace_period: 20s
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: .
+      dockerfile: services/frontend/Dockerfile
+      args:
+        VERSION: ${VERSION:-}
+        COMMIT: ${COMMIT:-unknown}
+        BUILD_TIME: ${BUILD_TIME:-unknown}
+    image: hellocalc-frontend:local
+    environment:
+      BACKEND_URL: http://backend:8080
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    ports:
+      - "${FRONTEND_PORT:-8080}:8080"
+    depends_on:
+      backend:
+        condition: service_healthy
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    stop_grace_period: 20s
+    restart: unless-stopped
