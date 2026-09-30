@@ -45,12 +45,12 @@ vet:
 ## check: local quality gate (format, vet, tests, build)
 check: fmt-check vet test build
 
-## docker-build: build both images tagged hellocalc-<service>:$(VERSION)
+## docker-build: build both images tagged hellocalc-<service>:$(COMMIT) (commit hash; no latest)
 docker-build:
 	@for s in $(SERVICES); do \
 		docker build -f services/$$s/Dockerfile \
 			--build-arg VERSION=$(VERSION) --build-arg COMMIT=$(COMMIT) --build-arg BUILD_TIME=$(BUILD_TIME) \
-			-t hellocalc-$$s:$(VERSION) . || exit 1; \
+			-t hellocalc-$$s:$(COMMIT) . || exit 1; \
 	done
 
 ## up: build and start both services with Docker Compose (http://localhost:8080)

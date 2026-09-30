@@ -56,7 +56,13 @@ A tiny two-service reference workload: a calculator split into a **frontend** (U
 | Docker Compose / 온프레미스 Docker 네트워크 | `http://backend:8080` (서비스·컨테이너 이름) |
 | Kubernetes | `http://hellocalc-backend` (Service 이름, 포트 80) |
 | AWS ECS | Service Connect 또는 Cloud Map 이름 (예: `http://hellocalc-backend:8080`) |
-| GCP Cloud Run | backend 서비스 URL (예: `https://hellocalc-backend-xxxx.a.run.app`) |
+| GCP Cloud Run | backend 서비스 URL (예: `https://hellocalc-backend-xxxx.a.run.app`). 아래 주의사항 참고 |
+
+**Cloud Run 주의사항:** Cloud Run은 기본적으로 IAM 인증된 호출만 받아요. 그런데 frontend 프록시는 Google ID 토큰을 붙이지 않아서, 그대로 배포하면 backend 호출이 403으로 막혀요.
+
+- backend는 **인증 없는 호출을 허용**해서 배포해요 (`--allow-unauthenticated`, Terraform이라면 `roles/run.invoker`를 `allUsers`에 부여).
+- 외부 노출은 IAM 대신 네트워크로 막아요. backend의 ingress를 `internal`로 두고, frontend에는 Direct VPC egress(모든 트래픽을 VPC로)를 설정하고, 그 서브넷에 Private Google Access를 켜요.
+- ingress를 `internal`로 두지 않으면 backend URL을 아는 누구나 계산 API를 직접 호출할 수 있어요. 데모용 샘플이라 데이터 위험은 없지만, "backend는 내부 전용"이라는 설계와는 달라져요.
 
 ### N-01 GitHub Actions 파이프라인 (`ci.yml`)
 

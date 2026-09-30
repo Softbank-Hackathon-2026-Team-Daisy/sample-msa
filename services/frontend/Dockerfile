@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 # hellocalc-frontend. Build from the repository root:
-#   docker build -f services/frontend/Dockerfile -t hellocalc-frontend .
+#   docker build -f services/frontend/Dockerfile -t hellocalc-frontend:local .
 
 # Build stage runs on the build host's native platform and cross-compiles,
 # so multi-arch builds (linux/amd64, linux/arm64) need no emulation.
