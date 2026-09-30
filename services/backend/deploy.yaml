@@ -9,3 +9,4 @@ env:                    # 일반 환경변수 (모두 선택, 기본값 있음)
 secrets: []             # 비밀값 없음
 database: false         # DB 불필요 (상태 없는 서비스)
 # 공개 여부: 내부 전용. 외부 노출 없이 frontend만 호출해요.
+# Cloud Run: frontend가 ID 토큰을 붙이지 않으므로 인증 없는 호출을 허용하고, ingress는 internal로 막아요 (README 참고).

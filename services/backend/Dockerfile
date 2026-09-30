@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 # hellocalc-backend. Build from the repository root:
-#   docker build -f services/backend/Dockerfile -t hellocalc-backend .
+#   docker build -f services/backend/Dockerfile -t hellocalc-backend:local .
 
 # Build stage runs on the build host's native platform and cross-compiles,
 # so multi-arch builds (linux/amd64, linux/arm64) need no emulation.
