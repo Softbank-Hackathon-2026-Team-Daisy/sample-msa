@@ -1,0 +1,11 @@
+# Daisy 배포 명세 (스키마: daisy/CLAUDE.md §5, 9/29 회의 초안)
+# 빌드: 레포 루트에서 docker build -f services/backend/Dockerfile .
+name: hellocalc-backend
+port: 8080              # 컨테이너 안에서 앱이 요청을 받는 포트
+healthcheck: /health    # 200 {"status":"ok"}
+env:                    # 일반 환경변수 (모두 선택, 기본값 있음)
+  - LOG_LEVEL           # debug | info | warn | error (기본 info)
+  - SHUTDOWN_TIMEOUT    # 종료 시 처리 중 요청 대기 한도 (기본 15s)
+secrets: []             # 비밀값 없음
+database: false         # DB 불필요 (상태 없는 서비스)
+# 공개 여부: 내부 전용. 외부 노출 없이 frontend만 호출해요.

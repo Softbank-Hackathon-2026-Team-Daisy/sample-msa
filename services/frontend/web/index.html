@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="description" content="HelloCalc — a tiny two-service reference workload.">
+  <title>HelloCalc</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%232f5d8a'/%3E%3Cpath d='M9 16h14M16 9v14' stroke='white' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <main class="shell">
+    <header class="brand">
+      <h1>HelloCalc</h1>
+      <p>A tiny two-service reference workload.</p>
+    </header>
+
+    <section class="calc" aria-label="Calculator">
+      <div class="display">
+        <div class="expression" id="expression" aria-label="Expression">&nbsp;</div>
+        <output class="value" id="value" role="status" aria-live="polite" aria-atomic="true">0</output>
+      </div>
+
+      <div class="keys" id="keys">
+        <button type="button" class="key fn" data-key="clear" aria-label="Clear">C</button>
+        <button type="button" class="key fn" data-key="back" aria-label="Backspace">&#9003;</button>
+        <button type="button" class="key op" data-key="^" aria-label="Power">x<sup>y</sup></button>
+        <button type="button" class="key op" data-key="%" aria-label="Modulo">mod</button>
+
+        <button type="button" class="key" data-key="7">7</button>
+        <button type="button" class="key" data-key="8">8</button>
+        <button type="button" class="key" data-key="9">9</button>
+        <button type="button" class="key op" data-key="/" aria-label="Divide">&divide;</button>
+
+        <button type="button" class="key" data-key="4">4</button>
+        <button type="button" class="key" data-key="5">5</button>
+        <button type="button" class="key" data-key="6">6</button>
+        <button type="button" class="key op" data-key="*" aria-label="Multiply">&times;</button>
+
+        <button type="button" class="key" data-key="1">1</button>
+        <button type="button" class="key" data-key="2">2</button>
+        <button type="button" class="key" data-key="3">3</button>
+        <button type="button" class="key op" data-key="-" aria-label="Subtract">&minus;</button>
+
+        <button type="button" class="key fn" data-key="neg" aria-label="Toggle sign">&plusmn;</button>
+        <button type="button" class="key" data-key="0">0</button>
+        <button type="button" class="key" data-key="." aria-label="Decimal point">.</button>
+        <button type="button" class="key op" data-key="+" aria-label="Add">+</button>
+
+        <button type="button" class="key eq" data-key="=" aria-label="Equals">=</button>
+      </div>
+    </section>
+
+    <footer class="foot" id="foot">&nbsp;</footer>
+  </main>
+</body>
+</html>
